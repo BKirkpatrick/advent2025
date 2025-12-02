@@ -9,17 +9,19 @@ import (
 )
 
 func main() {
-	path := "../testdata/day1_test.txt"
+	path := "../testdata/day1.txt"
+	var previousPosition int = 50
 	var currentPosition int = 50 // initial condition
 	var zeroCounter int = 0
+	var fullTurnCounter int = 0
+	var flipCounter int = 0
+	var nudgeCounter int = 0
 
 	// Read in our data line by line
 	lines, err := readLines(path)
 	if err != nil {
 		log.Printf("Problem reading input file")
 	}
-
-	fmt.Printf("We have %v entries\n", len(lines))
 
 	fmt.Printf("The dial starts by pointing at %v\n", currentPosition)
 
@@ -29,22 +31,46 @@ func main() {
 		if err != nil {
 			log.Printf("Error parsing message: %v\n", err)
 		}
-		// I only care about phase offset, so modulo 100
-		dist = dist % 100
+		// I don't just care about phase offset anymore = ^.^ = ffs
+		// fullTurns will record quotient of division
+		fullTurns := dist / 100
+		fullTurnCounter += fullTurns
+		partialTurn := dist % 100 // this is how much my position is going to change.
+
 		if dir == "R" {
-			currentPosition += dist
+			currentPosition = previousPosition + partialTurn
 		} else if dir == "L" {
-			currentPosition += (100 - dist)
+			currentPosition = previousPosition - partialTurn
 		}
-		// Make sure current position also stays <= 100
-		currentPosition = currentPosition % 100
-		fmt.Printf("The dial is rotated %v to point at %v\n", line, currentPosition)
-		// Keep count of the zeros
+
 		if currentPosition == 0 {
 			zeroCounter += 1
+		} else if currentPosition > 99 {
+			if previousPosition != 0 {
+				nudgeCounter += 1
+			}
+			currentPosition = currentPosition - 100
+		} else if currentPosition < 0 {
+			if previousPosition != 0 {
+				nudgeCounter += 1
+			}
+			currentPosition += 100
 		}
+
+		fmt.Printf("The dial is rotated %v to point at %v, Full turns: %v, zeroes: %v, flips: %v, nudge: %v\n", line, currentPosition, fullTurns, zeroCounter, flipCounter, nudgeCounter)
+		previousPosition = currentPosition
 	}
+
+	fmt.Printf("We have %v entries\n", len(lines))
+
 	fmt.Printf("Arrow landed on ZERO %v times\n", zeroCounter)
+	fmt.Printf("Arrow blew past ZERO %v times\n", fullTurnCounter)
+	fmt.Printf("Arrow did a little flip over ZERO %v times\n", flipCounter)
+	fmt.Printf("Arrow nudge over ZERO %v times\n", nudgeCounter)
+
+	answer := zeroCounter + fullTurnCounter + flipCounter + nudgeCounter
+
+	fmt.Printf("The code is: %v\n", answer)
 
 }
 
