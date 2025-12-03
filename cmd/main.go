@@ -10,10 +10,10 @@ import (
 )
 
 func main() {
-	path := "../testdata/day3_test.txt"
+	path := "../testdata/day3.txt"
 	var bankSlice []int
 	var highestJoltage int
-	//var totalJoltage int = 0
+	var totalJoltage int = 0
 
 	// Read in our data line by line
 	batteries, err := readLines(path)
@@ -21,21 +21,17 @@ func main() {
 		log.Printf("Problem reading input file")
 	}
 
-	fmt.Printf("Number of banks: %v\n", len(batteries))
-	fmt.Printf("Battery banks:\n%v\n", batteries)
-
 	for _, bank := range batteries {
+		//fmt.Printf("B: %v\n", bank)
 		bankSlice, _ = batteryBankToSlice(bank)
-		highestJoltage = findMaxJoltage(bankSlice, 12)
-		fmt.Printf("BANK: %v; JOLT: %v\n", bankSlice, highestJoltage)
+		highestJoltage = findJuiciestBatteries(bankSlice, 12)
 
-		// fmt.Printf("Bank:\n%v\n", bank)
+		totalJoltage += highestJoltage
 
-		// highestJoltage = findHightestJoltageInBank(bankSlice)
-		// fmt.Printf("Bank: %v --> Highest Joltage: %v\n", bankSlice, highestJoltage)
-		// totalJoltage += highestJoltage
+		fmt.Printf("B: %v --> %v\n", bank, highestJoltage)
 	}
-	//fmt.Printf("TOTAL JOLTAGE = %v\n", totalJoltage)
+	fmt.Printf("Number of banks: %v\n", len(batteries))
+	fmt.Printf("TOTAL JOLTAGE = %v\n", totalJoltage)
 }
 
 func readLines(path string) ([]string, error) {
@@ -75,70 +71,39 @@ func sliceToInt(s []int) int {
 	return res
 }
 
-func findMaxJoltage(bankSlice []int, nBatteries int) int {
-	highestJoltage := 0
+func findJuiciestBatteries(bankSlice []int, nBatteries int) int {
+	var searchingSlice []int
+	var innerSlice []int
+	var joltageDigits []int
+	var juiciestBattery int
+	remainingBatteries := nBatteries
 	joltage := 0
+
 	n := len(bankSlice)
-	// Okay so I don't care about finding big numbers if they are in the last
-	// (nBatteries - 1) digits, because I cannot form an integer that is nBatteries long
-	searchingSlice := bankSlice[:n-nBatteries+1]
-	biggestFirstDigit := slices.Max(searchingSlice) // this is the biggest first digit
-	// the only problem is there could be several of them
-	// Everytime you find one of these, use its index to look up the whole bankSlice and
-	// return the nBatteries-digit number it defines
-	for i, j := range searchingSlice {
-		if j == biggestFirstDigit {
-			joltage = sliceToInt(bankSlice[i : i+nBatteries])
-			if joltage > highestJoltage {
-				highestJoltage = joltage
+	searchingSlice = bankSlice // initialise
+	for remainingBatteries > 0 {
+		// Keep getting the next best battery until I have found all that I need
+		//fmt.Printf("Slice is %v long, I still have %v batteries to find, so we can search %v values\n", n, remainingBatteries, (n - remainingBatteries + 1))
+		innerSlice = searchingSlice[:(n - remainingBatteries + 1)]
+		//fmt.Printf("Searching: %v for juiciest battery\n", innerSlice)
+		juiciestBattery = slices.Max(innerSlice)
+		//fmt.Printf("Juiciest Battery: %v\n", juiciestBattery)
+		joltageDigits = append(joltageDigits, juiciestBattery)
+		// Now I need to find where that juiciest battery was and make a new search slice from there
+		for i, j := range searchingSlice {
+			if j == juiciestBattery {
+				// you found the juiciest battery
+				// make new searching slice
+				searchingSlice = searchingSlice[i+1:]
+				break
 			}
 		}
+		// now I found the best bettery and added it to digits recorder
+		// we now have to look for the next digit in another slice but we dont have its length yet
+		n = len(searchingSlice)
+		remainingBatteries-- // decrement number of remaining batteries
 	}
-	return highestJoltage
-}
-
-func findHightestJoltageInBank(bankSlice []int) int {
-	highestNumber := 0
-	joltage := 0
-	n := len(bankSlice)
-	// We can find the highest joltage quickly
-	biggestFirstDigit := slices.Max(bankSlice)
-
-	for m := range biggestFirstDigit {
-		fmt.Printf("Searching (%v) for battery with value %v\n", m, biggestFirstDigit)
-		for i, j := range bankSlice {
-			//fmt.Printf("i: %v, j: %v\n", i, j)
-			if j == biggestFirstDigit { // our first digit is as big as could be
-				// look through remaining digits
-				// first make sure that this is not the last digit in the slice
-				fmt.Printf("Located largest first digit\n")
-				if i == n-1 {
-					// If you are here you reached the end of the list and you dont have a joltage
-					// Start again with lower first digit
-					fmt.Printf("Largest first digit is at the end of the list!\nWill search for next highest first digit instead...\n")
-					biggestFirstDigit--
-					// Bonus - this number must be the largest second digit we could find, so no need to keep searching for it!
-					// biggestSecondDigit = j
-					continue
-				} else {
-					fmt.Printf("Now looking for second digit...\n")
-					biggestSecondDigit := slices.Max(bankSlice[i+1:])
-					fmt.Printf("Largest second digit = %v\n", biggestSecondDigit)
-					joltage = 10*j + biggestSecondDigit
-					if joltage > highestNumber {
-						// the joltage we just found is highest so far
-						highestNumber = joltage
-					}
-					break
-				}
-			}
-			continue // there could be multiple batteries that tie for highest joltage
-		}
-		if highestNumber >= 10 {
-			// we search from highest to lowest, and if we have found one we must be done
-			break
-		}
-	}
-	return highestNumber
-
+	// We should now have the largest joltage, as a slice
+	joltage = sliceToInt(joltageDigits)
+	return joltage
 }
