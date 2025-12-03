@@ -10,30 +10,32 @@ import (
 )
 
 func main() {
-	path := "../testdata/day3.txt"
+	path := "../testdata/day3_test.txt"
 	var bankSlice []int
 	var highestJoltage int
-	var totalJoltage int = 0
+	//var totalJoltage int = 0
 
 	// Read in our data line by line
 	batteries, err := readLines(path)
 	if err != nil {
 		log.Printf("Problem reading input file")
 	}
-	//batteries := string(lines)
 
 	fmt.Printf("Number of banks: %v\n", len(batteries))
-
 	fmt.Printf("Battery banks:\n%v\n", batteries)
 
 	for _, bank := range batteries {
-		fmt.Printf("Bank:\n%v\n", bank)
 		bankSlice, _ = batteryBankToSlice(bank)
-		highestJoltage = findHightestJoltageInBank(bankSlice)
-		fmt.Printf("Bank: %v --> Highest Joltage: %v\n", bankSlice, highestJoltage)
-		totalJoltage += highestJoltage
+		highestJoltage = findMaxJoltage(bankSlice, 12)
+		fmt.Printf("BANK: %v; JOLT: %v\n", bankSlice, highestJoltage)
+
+		// fmt.Printf("Bank:\n%v\n", bank)
+
+		// highestJoltage = findHightestJoltageInBank(bankSlice)
+		// fmt.Printf("Bank: %v --> Highest Joltage: %v\n", bankSlice, highestJoltage)
+		// totalJoltage += highestJoltage
 	}
-	fmt.Printf("TOTAL JOLTAGE = %v\n", totalJoltage)
+	//fmt.Printf("TOTAL JOLTAGE = %v\n", totalJoltage)
 }
 
 func readLines(path string) ([]string, error) {
@@ -63,12 +65,36 @@ func batteryBankToSlice(batteryBank string) ([]int, error) {
 	return bankSlice, nil
 }
 
-func findMaxJoltage(bankSlice []int, nBatteries int) []int {
+func sliceToInt(s []int) int {
+	res := 0
+	op := 1
+	for i := len(s) - 1; i >= 0; i-- {
+		res += s[i] * op
+		op *= 10
+	}
+	return res
+}
+
+func findMaxJoltage(bankSlice []int, nBatteries int) int {
+	highestJoltage := 0
+	joltage := 0
 	n := len(bankSlice)
 	// Okay so I don't care about finding big numbers if they are in the last
 	// (nBatteries - 1) digits, because I cannot form an integer that is nBatteries long
-	searchingSlice := bankSlice[:n-nBatteries]
-	return searchingSlice
+	searchingSlice := bankSlice[:n-nBatteries+1]
+	biggestFirstDigit := slices.Max(searchingSlice) // this is the biggest first digit
+	// the only problem is there could be several of them
+	// Everytime you find one of these, use its index to look up the whole bankSlice and
+	// return the nBatteries-digit number it defines
+	for i, j := range searchingSlice {
+		if j == biggestFirstDigit {
+			joltage = sliceToInt(bankSlice[i : i+nBatteries])
+			if joltage > highestJoltage {
+				highestJoltage = joltage
+			}
+		}
+	}
+	return highestJoltage
 }
 
 func findHightestJoltageInBank(bankSlice []int) int {
