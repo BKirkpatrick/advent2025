@@ -15,6 +15,7 @@ func main() {
 	var result [][]int
 	var nRolls int
 	threshold := 4
+	totalRemoved := 0
 
 	// Read in our data line by line
 	dat, err := readLines(path)
@@ -23,39 +24,48 @@ func main() {
 	}
 	paperGrid = buildGridFromDat(dat)
 
-	nnGrid = calculateNNGrid(paperGrid)
+	// We now need this whole thing to be in a loop
 
-	mask = makeMask(nnGrid, threshold)
+	for {
+		nnGrid = calculateNNGrid(paperGrid)
 
-	nRolls = calculateVulnerableRolls(paperGrid, mask)
+		mask = makeMask(nnGrid, threshold)
 
-	result = calculateFinalConfiguration(paperGrid, mask)
+		nRolls = calculateVulnerableRolls(paperGrid, mask)
+		totalRemoved += nRolls
 
-	before := renderIntGrid(paperGrid)
-	after := renderIntGrid(result)
+		result = calculateFinalConfiguration(paperGrid, mask)
 
-	fmt.Println("BEFORE")
-	for i, row := range before {
-		fmt.Printf("%v: %v\n", i, row)
+		//before := renderIntGrid(paperGrid)
+		after := renderIntGrid(result)
+
+		// fmt.Println("BEFORE")
+		// for i, row := range before {
+		// 	fmt.Printf("%v: %v\n", i, row)
+		// }
+
+		// fmt.Println("")
+
+		// fmt.Println("MASK")
+		// for i, row := range mask {
+		// 	fmt.Printf("%v: %v\n", i, row)
+		// }
+
+		fmt.Println("")
+
+		fmt.Println("AFTER")
+		for i, row := range after {
+			fmt.Printf("%v: %v\n", i, row)
+		}
+
+		fmt.Println("")
+
+		if nRolls == 0 {
+			break
+		}
+		paperGrid = result
 	}
-
-	// fmt.Println("")
-
-	// fmt.Println("MASK")
-	// for i, row := range mask {
-	// 	fmt.Printf("%v: %v\n", i, row)
-	// }
-
-	fmt.Println("")
-
-	fmt.Println("AFTER")
-	for i, row := range after {
-		fmt.Printf("%v: %v\n", i, row)
-	}
-
-	fmt.Println("")
-
-	fmt.Printf("ANSWER: %v\n", nRolls)
+	fmt.Printf("ANSWER: %v\n", totalRemoved)
 
 }
 
