@@ -6,71 +6,38 @@ import (
 	"log"
 	"os"
 	"strconv"
+	s "strings"
 )
 
 func main() {
-	path := "../testdata/day1.txt"
-	var previousPosition int = 50
-	var currentPosition int = 50 // initial condition
-	var zeroCounter int = 0
-	var fullTurnCounter int = 0
-	var flipCounter int = 0
-	var nudgeCounter int = 0
+	path := "../testdata/day5.txt"
+	var freshIDRanges []string
+	var items []string
 
 	// Read in our data line by line
-	lines, err := readLines(path)
+	dat, err := readLines(path)
 	if err != nil {
 		log.Printf("Problem reading input file")
 	}
 
-	fmt.Printf("The dial starts by pointing at %v\n", currentPosition)
-
-	// Go through each line and extract direction and distance of rotation
-	for _, line := range lines {
-		dir, dist, err := parseMessage(line)
-		if err != nil {
-			log.Printf("Error parsing message: %v\n", err)
+	listTracker := 0
+	for _, line := range dat {
+		if line == "" {
+			listTracker = 1
 		}
-		// I don't just care about phase offset anymore = ^.^ = ffs
-		// fullTurns will record quotient of division
-		fullTurns := dist / 100
-		fullTurnCounter += fullTurns
-		partialTurn := dist % 100 // this is how much my position is going to change.
-
-		if dir == "R" {
-			currentPosition = previousPosition + partialTurn
-		} else if dir == "L" {
-			currentPosition = previousPosition - partialTurn
+		if listTracker == 0 {
+			freshIDRanges = append(freshIDRanges, line)
+		} else {
+			items = append(items, line)
 		}
-
-		if currentPosition == 0 {
-			zeroCounter += 1
-		} else if currentPosition > 99 {
-			if previousPosition != 0 {
-				nudgeCounter += 1
-			}
-			currentPosition = currentPosition - 100
-		} else if currentPosition < 0 {
-			if previousPosition != 0 {
-				nudgeCounter += 1
-			}
-			currentPosition += 100
-		}
-
-		fmt.Printf("The dial is rotated %v to point at %v, Full turns: %v, zeroes: %v, flips: %v, nudge: %v\n", line, currentPosition, fullTurns, zeroCounter, flipCounter, nudgeCounter)
-		previousPosition = currentPosition
 	}
 
-	fmt.Printf("We have %v entries\n", len(lines))
+	howBadIsThis(freshIDRanges, items)
 
-	fmt.Printf("Arrow landed on ZERO %v times\n", zeroCounter)
-	fmt.Printf("Arrow blew past ZERO %v times\n", fullTurnCounter)
-	fmt.Printf("Arrow did a little flip over ZERO %v times\n", flipCounter)
-	fmt.Printf("Arrow nudge over ZERO %v times\n", nudgeCounter)
+	nFreshItems := countUniqueInRanges(freshIDRanges)
 
-	answer := zeroCounter + fullTurnCounter + flipCounter + nudgeCounter
-
-	fmt.Printf("The code is: %v\n", answer)
+	// Answer
+	fmt.Printf("\nANSWER: %v\n", nFreshItems)
 
 }
 
@@ -89,12 +56,108 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func parseMessage(msg string) (string, int, error) {
-	dir := string(msg[0])
-	distStr := string(msg[1:])
-	dist, err := strconv.Atoi(distStr)
-	if err != nil {
-		log.Printf("Could not convert distance to int, err: %v\n", err)
+func getBoundsFromRange(idRange string) (int, int) {
+	limits := s.Split(idRange, "-")
+	start, _ := strconv.Atoi(limits[0])
+	end, _ := strconv.Atoi(limits[1])
+	return start, end
+
+}
+
+func countUniqueInRanges(idRanges []string) int {
+	// Parse all ranges
+	type Range struct {
+		start, end int
 	}
-	return dir, dist, err
+	var ranges []Range
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		ranges = append(ranges, Range{start, end})
+	}
+
+	// Sort ranges by start position
+	// Use a simple bubble sort because I know the name of that sorting algorithm
+	for i := 0; i < len(ranges); i++ {
+		for j := i + 1; j < len(ranges); j++ {
+			if ranges[j].start < ranges[i].start {
+				ranges[i], ranges[j] = ranges[j], ranges[i]
+			}
+		}
+	}
+
+	// Merge overlapping ranges and count
+	if len(ranges) == 0 {
+		return 0
+	}
+
+	count := 0
+	current := ranges[0]
+
+	for i := 1; i < len(ranges); i++ {
+		if ranges[i].start <= current.end+1 {
+			// Overlapping or adjacent - we should merge this
+			if ranges[i].end > current.end {
+				current.end = ranges[i].end
+			}
+		} else {
+			// No overlap - count current range and move to next
+			count += current.end - current.start + 1
+			current = ranges[i]
+		}
+	}
+	// Don't forget the last range, idiot!
+	count += current.end - current.start + 1
+
+	return count
+}
+
+func howBadIsThis(idRanges []string, items []string) {
+	nItems := len(items)
+	nIDRanges := len(idRanges)
+	nIDs := 0
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		nIDs += (end - start)
+	}
+	fmt.Printf("We have to check %v items against %v fresh IDS split across %v ID Ranges\n", nItems, nIDs, nIDRanges)
+}
+
+func isInRanges(id int, idRanges []string) bool {
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		if id >= start && id <= end {
+			return true
+		}
+	}
+	return false
+}
+
+func getMyFreshItems(myItems []string, idRanges []string) []string {
+	var myFreshItems []string
+	for _, item := range myItems {
+		id, _ := strconv.Atoi(item)
+		if isInRanges(id, idRanges) {
+			myFreshItems = append(myFreshItems, item)
+		}
+	}
+	return myFreshItems
+}
+
+func findMaxID(idRanges []string) int {
+	maxID := 0
+	for _, idRange := range idRanges {
+		_, end := getBoundsFromRange(idRange)
+		if end > maxID {
+			maxID = end
+		}
+	}
+	return maxID
+}
+
+func makeList(n int) []string {
+	result := make([]string, 0, n)
+	for i := 1; i <= n; i++ {
+		result = append(result, strconv.Itoa(i))
+	}
+	return result
 }
