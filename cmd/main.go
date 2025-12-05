@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	s "strings"
 )
 
 func main() {
-	path := "../testdata/day5_test.txt"
+	path := "../testdata/day5.txt"
 	var freshIDRanges []string
 	var items []string
 
@@ -30,14 +32,13 @@ func main() {
 		}
 	}
 
-	fmt.Println("Fresh ID Ranges:")
-	for _, id := range freshIDRanges {
-		fmt.Printf("%v\n", id)
-	}
-	fmt.Printf("\nItems:")
-	for _, item := range items {
-		fmt.Printf("%v\n", item)
-	}
+	howBadIsThis(freshIDRanges, items)
+
+	freshItems := getMyFreshItems(items, freshIDRanges)
+	nFreshItems := len(freshItems)
+
+	// Answer
+	fmt.Printf("\nANSWER: %v\n", nFreshItems)
 
 }
 
@@ -54,4 +55,44 @@ func readLines(path string) ([]string, error) {
 		lines = append(lines, scanner.Text())
 	}
 	return lines, scanner.Err()
+}
+
+func getBoundsFromRange(idRange string) (int, int) {
+	limits := s.Split(idRange, "-")
+	start, _ := strconv.Atoi(limits[0])
+	end, _ := strconv.Atoi(limits[1])
+	return start, end
+
+}
+
+func howBadIsThis(idRanges []string, items []string) {
+	nItems := len(items)
+	nIDRanges := len(idRanges)
+	nIDs := 0
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		nIDs += (end - start)
+	}
+	fmt.Printf("We have to check %v items against %v fresh IDS split across %v ID Ranges\n", nItems, nIDs, nIDRanges)
+}
+
+func isInRanges(id int, idRanges []string) bool {
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		if id >= start && id <= end {
+			return true
+		}
+	}
+	return false
+}
+
+func getMyFreshItems(myItems []string, idRanges []string) []string {
+	var myFreshItems []string
+	for _, item := range myItems {
+		id, _ := strconv.Atoi(item)
+		if isInRanges(id, idRanges) {
+			myFreshItems = append(myFreshItems, item)
+		}
+	}
+	return myFreshItems
 }
