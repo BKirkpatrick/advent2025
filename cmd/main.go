@@ -34,8 +34,7 @@ func main() {
 
 	howBadIsThis(freshIDRanges, items)
 
-	freshItems := getMyFreshItems(items, freshIDRanges)
-	nFreshItems := len(freshItems)
+	nFreshItems := countUniqueInRanges(freshIDRanges)
 
 	// Answer
 	fmt.Printf("\nANSWER: %v\n", nFreshItems)
@@ -63,6 +62,53 @@ func getBoundsFromRange(idRange string) (int, int) {
 	end, _ := strconv.Atoi(limits[1])
 	return start, end
 
+}
+
+func countUniqueInRanges(idRanges []string) int {
+	// Parse all ranges
+	type Range struct {
+		start, end int
+	}
+	var ranges []Range
+	for _, idRange := range idRanges {
+		start, end := getBoundsFromRange(idRange)
+		ranges = append(ranges, Range{start, end})
+	}
+
+	// Sort ranges by start position
+	// Use a simple bubble sort because I know the name of that sorting algorithm
+	for i := 0; i < len(ranges); i++ {
+		for j := i + 1; j < len(ranges); j++ {
+			if ranges[j].start < ranges[i].start {
+				ranges[i], ranges[j] = ranges[j], ranges[i]
+			}
+		}
+	}
+
+	// Merge overlapping ranges and count
+	if len(ranges) == 0 {
+		return 0
+	}
+
+	count := 0
+	current := ranges[0]
+
+	for i := 1; i < len(ranges); i++ {
+		if ranges[i].start <= current.end+1 {
+			// Overlapping or adjacent - we should merge this
+			if ranges[i].end > current.end {
+				current.end = ranges[i].end
+			}
+		} else {
+			// No overlap - count current range and move to next
+			count += current.end - current.start + 1
+			current = ranges[i]
+		}
+	}
+	// Don't forget the last range, idiot!
+	count += current.end - current.start + 1
+
+	return count
 }
 
 func howBadIsThis(idRanges []string, items []string) {
@@ -95,4 +141,23 @@ func getMyFreshItems(myItems []string, idRanges []string) []string {
 		}
 	}
 	return myFreshItems
+}
+
+func findMaxID(idRanges []string) int {
+	maxID := 0
+	for _, idRange := range idRanges {
+		_, end := getBoundsFromRange(idRange)
+		if end > maxID {
+			maxID = end
+		}
+	}
+	return maxID
+}
+
+func makeList(n int) []string {
+	result := make([]string, 0, n)
+	for i := 1; i <= n; i++ {
+		result = append(result, strconv.Itoa(i))
+	}
+	return result
 }
