@@ -10,9 +10,9 @@ import (
 )
 
 func main() {
-	path := "../testdata/day5.txt"
-	var freshIDRanges []string
-	var items []string
+	path := "../testdata/day6.txt"
+	var mathsSheet [][]string
+	//var operators []string
 
 	// Read in our data line by line
 	dat, err := readLines(path)
@@ -20,24 +20,17 @@ func main() {
 		log.Printf("Problem reading input file")
 	}
 
-	listTracker := 0
-	for _, line := range dat {
-		if line == "" {
-			listTracker = 1
-		}
-		if listTracker == 0 {
-			freshIDRanges = append(freshIDRanges, line)
-		} else {
-			items = append(items, line)
-		}
-	}
+	mathsSheet = buildMathsStr(dat)
 
-	howBadIsThis(freshIDRanges, items)
+	ans := doMyHomework(mathsSheet)
 
-	nFreshItems := countUniqueInRanges(freshIDRanges)
+	//print result
+	// for _, row := range mathsSheet {
+	// 	fmt.Printf("%v\n", row)
+	// }
+	// fmt.Printf("%v\n", len(mathsSheet))
 
-	// Answer
-	fmt.Printf("\nANSWER: %v\n", nFreshItems)
+	fmt.Printf("ANSWER %v\n", ans)
 
 }
 
@@ -56,108 +49,66 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func getBoundsFromRange(idRange string) (int, int) {
-	limits := s.Split(idRange, "-")
-	start, _ := strconv.Atoi(limits[0])
-	end, _ := strconv.Atoi(limits[1])
-	return start, end
-
-}
-
-func countUniqueInRanges(idRanges []string) int {
-	// Parse all ranges
-	type Range struct {
-		start, end int
-	}
-	var ranges []Range
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		ranges = append(ranges, Range{start, end})
-	}
-
-	// Sort ranges by start position
-	// Use a simple bubble sort because I know the name of that sorting algorithm
-	for i := 0; i < len(ranges); i++ {
-		for j := i + 1; j < len(ranges); j++ {
-			if ranges[j].start < ranges[i].start {
-				ranges[i], ranges[j] = ranges[j], ranges[i]
-			}
+func buildMathsStr(dat []string) [][]string {
+	var mathsSheet [][]string
+	for _, line := range dat {
+		fields := s.Fields(line) // splits on any whitespace, skips empties
+		if len(fields) == 0 {
+			continue
 		}
+		mathsSheet = append(mathsSheet, fields)
 	}
+	return mathsSheet
+}
 
-	// Merge overlapping ranges and count
-	if len(ranges) == 0 {
-		return 0
-	}
-
-	count := 0
-	current := ranges[0]
-
-	for i := 1; i < len(ranges); i++ {
-		if ranges[i].start <= current.end+1 {
-			// Overlapping or adjacent - we should merge this
-			if ranges[i].end > current.end {
-				current.end = ranges[i].end
-			}
-		} else {
-			// No overlap - count current range and move to next
-			count += current.end - current.start + 1
-			current = ranges[i]
+func doMathsOperation(mathSheetCol []string) int {
+	ans := 0
+	n := len(mathSheetCol)
+	numbers := mathSheetCol[:(n - 1)]
+	operator := mathSheetCol[n-1]
+	fmt.Printf("numbers: %v\n", numbers)
+	fmt.Printf("operator: %v\n", operator)
+	if operator == "*" {
+		fmt.Printf("Performing multiplication\n")
+		ans = 1
+		for _, j := range numbers {
+			intJ, _ := strconv.Atoi(string(j))
+			//fmt.Printf("Multiplying %v by %v...\n", ans, intJ)
+			ans *= intJ
+			//fmt.Printf("Got %v\n", ans)
 		}
-	}
-	// Don't forget the last range, idiot!
-	count += current.end - current.start + 1
-
-	return count
-}
-
-func howBadIsThis(idRanges []string, items []string) {
-	nItems := len(items)
-	nIDRanges := len(idRanges)
-	nIDs := 0
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		nIDs += (end - start)
-	}
-	fmt.Printf("We have to check %v items against %v fresh IDS split across %v ID Ranges\n", nItems, nIDs, nIDRanges)
-}
-
-func isInRanges(id int, idRanges []string) bool {
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		if id >= start && id <= end {
-			return true
+	} else if operator == "+" {
+		fmt.Printf("Performing addition\n")
+		ans = 0
+		for _, j := range numbers {
+			intJ, _ := strconv.Atoi(string(j))
+			ans += intJ
 		}
+	} else {
+		fmt.Printf("Unknown Operation: %v\n", operator)
 	}
-	return false
+	//fmt.Printf("About to return answer: %v\n", ans)
+	return ans
 }
 
-func getMyFreshItems(myItems []string, idRanges []string) []string {
-	var myFreshItems []string
-	for _, item := range myItems {
-		id, _ := strconv.Atoi(item)
-		if isInRanges(id, idRanges) {
-			myFreshItems = append(myFreshItems, item)
-		}
+func column(sheet [][]string, col int) []string {
+	out := make([]string, len(sheet))
+	for i := range sheet {
+		out[i] = sheet[i][col]
 	}
-	return myFreshItems
+	return out
 }
 
-func findMaxID(idRanges []string) int {
-	maxID := 0
-	for _, idRange := range idRanges {
-		_, end := getBoundsFromRange(idRange)
-		if end > maxID {
-			maxID = end
-		}
-	}
-	return maxID
-}
+func doMyHomework(mathsSheet [][]string) int {
+	ans := 0
+	nCols := len(mathsSheet[0])
+	fmt.Printf("We have %v operations to do\n", nCols)
 
-func makeList(n int) []string {
-	result := make([]string, 0, n)
-	for i := 1; i <= n; i++ {
-		result = append(result, strconv.Itoa(i))
+	for i := 0; i < nCols; i++ {
+		col := column(mathsSheet, i)
+		fmt.Printf("\nColumn: %v\n", col)
+		ansCol := doMathsOperation(col)
+		ans += ansCol
 	}
-	return result
+	return ans
 }
