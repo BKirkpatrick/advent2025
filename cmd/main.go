@@ -1,114 +1,118 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
-	s "strings"
+	"strings"
 )
 
 func main() {
-	path := "../testdata/day6.txt"
-	var mathsSheet [][]string
-	//var operators []string
+	input, _ := os.ReadFile("../testdata/day6.txt")
 
-	// Read in our data line by line
-	dat, err := readLines(path)
-	if err != nil {
-		log.Printf("Problem reading input file")
+	rows := strings.Split(strings.TrimRight(string(input), "\n"), "\n")
+	h := len(rows)
+
+	ops := []rune{}
+	for _, f := range strings.Fields(rows[h-1]) {
+		ops = append(ops, rune(f[0]))
 	}
 
-	mathsSheet = buildMathsStr(dat)
-
-	ans := doMyHomework(mathsSheet)
-
-	//print result
-	// for _, row := range mathsSheet {
-	// 	fmt.Printf("%v\n", row)
-	// }
-	// fmt.Printf("%v\n", len(mathsSheet))
-
-	fmt.Printf("ANSWER %v\n", ans)
-
-}
-
-func readLines(path string) ([]string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	return lines, scanner.Err()
-}
-
-func buildMathsStr(dat []string) [][]string {
-	var mathsSheet [][]string
-	for _, line := range dat {
-		fields := s.Fields(line) // splits on any whitespace, skips empties
-		if len(fields) == 0 {
-			continue
+	var nums [][]int
+	for _, row := range rows[:h-1] {
+		fs := strings.Fields(row)
+		arr := make([]int, len(fs))
+		for i, f := range fs {
+			n, _ := strconv.Atoi(f)
+			arr[i] = n
 		}
-		mathsSheet = append(mathsSheet, fields)
+		nums = append(nums, arr)
 	}
-	return mathsSheet
+
+	fmt.Println("part 1:", c(nums, ops))
+	fmt.Println("part 2:", c2(rows[:h-1], rows[h-1]))
 }
 
-func doMathsOperation(mathSheetCol []string) int {
-	ans := 0
-	n := len(mathSheetCol)
-	numbers := mathSheetCol[:(n - 1)]
-	operator := mathSheetCol[n-1]
-	fmt.Printf("numbers: %v\n", numbers)
-	fmt.Printf("operator: %v\n", operator)
-	if operator == "*" {
-		fmt.Printf("Performing multiplication\n")
-		ans = 1
-		for _, j := range numbers {
-			intJ, _ := strconv.Atoi(string(j))
-			//fmt.Printf("Multiplying %v by %v...\n", ans, intJ)
-			ans *= intJ
-			//fmt.Printf("Got %v\n", ans)
+func c(nums [][]int, ops []rune) int {
+	sum := 0
+	for p := 0; p < len(nums[0]); p++ {
+		acc := nums[0][p]
+		for r := 1; r < len(nums); r++ {
+			if ops[p] == '+' {
+				acc += nums[r][p]
+			} else {
+				acc *= nums[r][p]
+			}
 		}
-	} else if operator == "+" {
-		fmt.Printf("Performing addition\n")
-		ans = 0
-		for _, j := range numbers {
-			intJ, _ := strconv.Atoi(string(j))
-			ans += intJ
-		}
-	} else {
-		fmt.Printf("Unknown Operation: %v\n", operator)
+		sum += acc
 	}
-	//fmt.Printf("About to return answer: %v\n", ans)
-	return ans
+	return sum
 }
 
-func column(sheet [][]string, col int) []string {
-	out := make([]string, len(sheet))
-	for i := range sheet {
-		out[i] = sheet[i][col]
+func c2(lines []string, opLine string) int64 {
+	var opPos []int
+	for i, c := range opLine {
+		if c == '+' || c == '*' {
+			opPos = append(opPos, i)
+		}
+	}
+	result := int64(0)
+
+	for i := range opPos {
+		start := opPos[i]
+		end := len(opLine)
+		if i+1 < len(opPos) {
+			end = opPos[i+1]
+		}
+
+		var colText []string
+		for _, line := range lines {
+			if start < len(line) {
+				if end > len(line) {
+					end = len(line)
+				}
+				colText = append(colText, line[start:end])
+			} else {
+				colText = append(colText, "")
+			}
+		}
+
+		nums := extractVertical(colText)
+		op := rune(opLine[start])
+
+		result += applyOp(nums, op)
+	}
+
+	return result
+}
+
+func extractVertical(lines []string) []int {
+	maxH := len(lines)
+	var out []int
+
+	for col := 0; col < len(lines[0]); col++ {
+		var b strings.Builder
+		for row := range maxH {
+			if col < len(lines[row]) && lines[row][col] != ' ' {
+				b.WriteByte(lines[row][col])
+			}
+		}
+		if b.Len() > 0 {
+			n, _ := strconv.Atoi(b.String())
+			out = append(out, n)
+		}
 	}
 	return out
 }
 
-func doMyHomework(mathsSheet [][]string) int {
-	ans := 0
-	nCols := len(mathsSheet[0])
-	fmt.Printf("We have %v operations to do\n", nCols)
-
-	for i := 0; i < nCols; i++ {
-		col := column(mathsSheet, i)
-		fmt.Printf("\nColumn: %v\n", col)
-		ansCol := doMathsOperation(col)
-		ans += ansCol
+func applyOp(nums []int, op rune) int64 {
+	acc := int64(nums[0])
+	for _, n := range nums[1:] {
+		if op == '+' {
+			acc += int64(n)
+		} else {
+			acc *= int64(n)
+		}
 	}
-	return ans
+	return acc
 }
