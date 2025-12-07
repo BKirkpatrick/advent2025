@@ -2,35 +2,117 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
+	s "strings"
 )
 
+var splitCounter int
+var timeLineCounter int
+
 func main() {
-	input, _ := os.ReadFile("../testdata/day6.txt")
+	input, _ := os.ReadFile("../testdata/day7_test.txt")
+	splitCounter = 0
+	timeLineCounter = 0
 
-	rows := strings.Split(strings.TrimRight(string(input), "\n"), "\n")
+	rows := s.Split(s.TrimRight(string(input), "\n"), "\n")
 	h := len(rows)
+	w := len(rows[0])
 
-	ops := []rune{}
-	for _, f := range strings.Fields(rows[h-1]) {
-		ops = append(ops, rune(f[0]))
+	fmt.Printf("We have %v rows, %v columns\n\n", h, w)
+
+	for i, row := range rows {
+		fmt.Printf("%v: %v\n", i, row)
 	}
 
-	var nums [][]int
-	for _, row := range rows[:h-1] {
-		fs := strings.Fields(row)
-		arr := make([]int, len(fs))
-		for i, f := range fs {
-			n, _ := strconv.Atoi(f)
-			arr[i] = n
+	fmt.Println("")
+
+	var finalField []string
+	var thisRow string
+	for i := range h - 1 {
+		if i == 0 {
+			finalField = append(finalField, rows[0])
+			thisRow = initiateManifold(rows[0], w)
 		}
-		nums = append(nums, arr)
+		nextRow := advanceTime(thisRow, rows[i+1], w)
+		finalField = append(finalField, nextRow)
+		thisRow = nextRow
 	}
 
-	fmt.Println("part 1:", c(nums, ops))
-	fmt.Println("part 2:", c2(rows[:h-1], rows[h-1]))
+	for i, row := range finalField {
+		fmt.Printf("%v: %v\n", i, row)
+	}
+
+	fmt.Printf("\nTotal Splits: %v\n", splitCounter)
+	fmt.Printf("\nTimelines: %v\n", timeLineCounter)
+
+	// var nums [][]int
+	// for _, row := range rows[:h-1] {
+	// 	fs := strings.Fields(row)
+	// 	arr := make([]int, len(fs))
+	// 	for i, f := range fs {
+	// 		n, _ := strconv.Atoi(f)
+	// 		arr[i] = n
+	// 	}
+	// 	nums = append(nums, arr)
+	// }
+
+	// fmt.Println("part 1:", c(nums, ops))
+	// fmt.Println("part 2:", c2(rows[:h-1], rows[h-1]))
+}
+
+// advanceTime uses row1 to update row2 to row2Updated
+func advanceTime(row1 string, row2 string, w int) string {
+	row2Updated := s.Repeat(".", w)
+	b := []byte(row2Updated)
+	for i, char := range row1 {
+		if char == '.' {
+			// row 2 should be unchanged
+			continue
+		} else if char == '^' {
+			// row 2 should be unchanged - shelter behind splitter
+			continue
+		} else if char == '|' {
+			// check what we are about to hit
+			if row2[i] == '.' {
+				// Here the beam hits empty space and continues
+				b[i] = '|'
+			} else if row2[i] == '^' {
+				// Beam has hit splitter
+				splitCounter++
+				timeLineCounter += 2
+				// Splitter stays
+				b[i] = '^'
+				// and positions adjacent to splitter become beams
+				b[i-1] = '|'
+				b[i+1] = '|'
+			} else {
+				log.Fatalf("Unknown character: %v\n", char)
+			}
+		}
+	}
+	row2Updated = string(b)
+	return row2Updated
+}
+
+func initiateManifold(startRow string, w int) string {
+	betterStartRow := s.Repeat(".", w)
+	b := []byte(betterStartRow)
+	for i, char := range startRow {
+		if char == '.' {
+			// do nothing
+			continue
+		} else if char == 'S' {
+			// this is a tachyon source
+			b[i] = '|'
+		} else {
+			log.Fatalf("Unknow character: %v\n", char)
+		}
+	}
+	betterStartRow = string(b)
+	return betterStartRow
 }
 
 func c(nums [][]int, ops []rune) int {
