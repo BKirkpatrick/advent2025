@@ -1,21 +1,26 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"log"
 	"os"
+	"strconv"
 	s "strings"
 )
 
-var splitCounter int
+type Vec3 struct {
+	X, Y, Z float64
+}
 
 func main() {
-	input, _ := os.ReadFile("../testdata/day7.txt")
-	splitCounter = 0
+	filepath := "../testdata/day8_test.txt"
+	input, _ := os.ReadFile(filepath)
 
 	rows := s.Split(s.TrimRight(string(input), "\n"), "\n")
 	h := len(rows)
 	w := len(rows[0])
+
+	coords, _ := loadVec3File(filepath)
 
 	fmt.Printf("We have %v rows, %v columns\n\n", h, w)
 
@@ -25,89 +30,43 @@ func main() {
 
 	fmt.Println("")
 
-	timeLines := countTimelines(rows, w)
-	nTimeLines := 0
-
-	for _, v := range timeLines {
-		nTimeLines += v
+	for i, row := range coords {
+		fmt.Printf("%v: %v\n", i, row)
 	}
-
-	fmt.Printf("\nTimelines: %v\n", nTimeLines)
 
 }
 
-func countTimelines(finalField []string, w int) []int {
-	timeLineCounter := make([]int, w)
-	for i, row := range finalField {
-		b := []byte(row)
-		if i == 0 {
-			//special case
-			for j, char := range b {
-				if char == 'S' {
-					timeLineCounter[j] = 1
-				}
-			}
-		} else {
-			for j, char := range b {
-				if char == '^' {
-					timeLineCounter[j-1] += timeLineCounter[j]
-					timeLineCounter[j+1] += timeLineCounter[j]
-					timeLineCounter[j] = 0
-				}
-			}
-		}
-		fmt.Printf("%v\n", timeLineCounter)
+func loadVec3File(path string) ([]Vec3, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
-	return timeLineCounter
-}
+	defer file.Close()
 
-// advanceTime uses row1 to update row2 to row2Updated
-func advanceTime(row1 string, row2 string, w int) string {
-	row2Updated := s.Repeat(".", w)
-	b := []byte(row2Updated)
-	for i, char := range row1 {
-		if char == '.' {
-			// row 2 should be unchanged
-			continue
-		} else if char == '^' {
-			// row 2 should be unchanged - shelter behind splitter
-			continue
-		} else if char == '|' {
-			// check what we are about to hit
-			if row2[i] == '.' {
-				// Here the beam hits empty space and continues
-				b[i] = '|'
-			} else if row2[i] == '^' {
-				// Beam has hit splitter
-				splitCounter++
-				// Splitter stays
-				b[i] = '^'
-				// and positions adjacent to splitter become beams
-				b[i-1] = '|'
-				b[i+1] = '|'
-			} else {
-				log.Fatalf("Unknown character: %v\n", char)
-			}
-		}
-	}
-	row2Updated = string(b)
-	return row2Updated
-}
+	var points []Vec3
 
-func initiateManifold(startRow string, w int) string {
-	betterStartRow := s.Repeat(".", w)
-	b := []byte(betterStartRow)
-	for i, char := range startRow {
-		if char == '.' {
-			// do nothing
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := s.TrimSpace(scanner.Text())
+		if line == "" {
 			continue
-		} else if char == 'S' {
-			// this is a tachyon source
-			b[i] = '|'
-		} else {
-			log.Fatalf("Unknow character: %v\n", char)
 		}
+
+		coords := s.Split(line, ",")
+
+		if len(coords) != 3 {
+			return nil, fmt.Errorf("invalid line: %q", line)
+		}
+
+		x, err1 := strconv.Atoi(coords[0])
+		y, err2 := strconv.Atoi(coords[1])
+		z, err3 := strconv.Atoi(coords[2])
+		if err1 != nil || err2 != nil || err3 != nil {
+			return nil, fmt.Errorf("invalid integers on line: %q", line)
+		}
+
+		points = append(points, Vec3{float64(x), float64(y), float64(z)})
 	}
-	betterStartRow = string(b)
-	return betterStartRow
+
+	return points, scanner.Err()
 }
