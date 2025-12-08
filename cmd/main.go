@@ -37,43 +37,30 @@ func main() {
 
 	distanceInfo := fillDistanceLog(coords)
 
-	clusterMap, nodeMap, index := getClusterMap(distanceInfo, nJoins, n)
+	clusterMap, nodeMap := getClusterMap(distanceInfo, nJoins, n)
 
 	answer := scoreTopN(clusterMap, topN)
 
-	// _ = index
-	// index = 5493
-	// fmt.Printf("\nINFO: %v\n", distanceInfo[index-1])
-
-	answer2 := lastDistance(distanceInfo, index)
-
-	//fmt.Printf("\nWe have %v junction boxes to look through\n", topN)
-
-	//fmt.Printf("\nWe have %v unique distances\n", nDistances)
-
-	// fmt.Printf("\nDISTANCE INFO:\n")
-	// for i, row := range distanceInfo {
-	// 	if i < nJoins {
-	// 		fmt.Printf("%v: %v\n", i, row)
-	// 	}
-	// }
-
-	// fmt.Printf("\nCLUSTER MAP:\n")
-	// for i, row := range clusterMap {
-	// 	fmt.Printf("%v: %v\n", i, row)
-	// }
-
 	_ = nodeMap
-
-	// fmt.Printf("\nNODE MAP:\n")
-	// for i, row := range nodeMap {
-	// 	fmt.Printf("%v: %v\n", i, row)
-	// }
 
 	fmt.Printf("\nFINAL ANSWER = %v\n", answer)
 
-	fmt.Printf("\nFINAL FINAL ANSWER = %v\n", answer2)
+}
 
+func mapComplete(clusterMap map[int][]int, nMembers int) bool {
+	var ans bool
+	keys := make([]int, 0, len(clusterMap))
+	for k := range clusterMap {
+		keys = append(keys, k)
+	}
+	if len(keys) > 0 {
+		if len(clusterMap[keys[0]]) == nMembers {
+			ans = true
+		} else {
+			ans = false
+		}
+	}
+	return ans
 }
 
 func lastDistance(distances []DistanceLog, nDistances int) float64 {
@@ -106,8 +93,7 @@ func scoreTopN(clusterMap map[int][]int, n int) int {
 	return runningProduct
 }
 
-func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[int][]int, map[int]int, int) {
-	index := 0
+func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[int][]int, map[int]int) {
 	clusterMap := make(map[int][]int)
 	nodeMap := make(map[int]int)
 	clusterID := 1
@@ -121,17 +107,14 @@ func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[
 
 		fmt.Printf("CLUSTER MAP (%v): %v\n", i, clusterMap)
 
-		if len(clusterMap[id1]) == nJunctions || len(clusterMap[id2]) == nJunctions {
-			index = i
-
-			//fmt.Printf("We have a single Super Cluster! i = %v\n%v\n", index, distanceInfo[index])
-
-			fmt.Printf("\nThis cluster: %v\nwas completed just before iteration %v\n", clusterMap, i)
-			fmt.Printf("We joined %v to %v\n", distanceInfo[i-1].id1, distanceInfo[i-1].id2)
-
-			fmt.Printf("Distance INFO: %v\n", distanceInfo[i-1])
-			fmt.Printf("x1: %v, x2: %v --> ANS = %v\n", distanceInfo[i-1].v1.X, distanceInfo[i-1].v2.X, distanceInfo[i-1].v1.X*distanceInfo[i-1].v2.X)
-
+		if mapComplete(clusterMap, nJunctions) {
+			fmt.Printf("DONE\n")
+			fmt.Printf("The final connection was:\n")
+			fmt.Printf("INFO %v - %v\n", i-1, distanceInfo[i-1])
+			x1 := distanceInfo[i-1].v1.X
+			x2 := distanceInfo[i-1].v2.X
+			prod := x1 * x2
+			fmt.Printf("X1: %v, X2: %v -- PROD: %v\n", x1, x2, prod)
 			break
 		}
 
@@ -193,7 +176,7 @@ func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[
 
 		//clusterMap[clusterID] = append(clusterMap[clusterID], distanceInfo[i].id1, distanceInfo[i].id2)
 	}
-	return clusterMap, nodeMap, index
+	return clusterMap, nodeMap
 }
 
 func fillDistanceLog(coords []Vec3) []DistanceLog {
