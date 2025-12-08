@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
+	"sort"
 	"strconv"
 	s "strings"
 )
@@ -12,28 +14,208 @@ type Vec3 struct {
 	X, Y, Z float64
 }
 
-func main() {
-	filepath := "../testdata/day8_test.txt"
-	input, _ := os.ReadFile(filepath)
+// clusterID == 0 means that those vectors are not linked
+type DistanceLog struct {
+	id1       int
+	id2       int
+	v1        Vec3
+	v2        Vec3
+	d         float64
+	clusterId int
+}
 
-	rows := s.Split(s.TrimRight(string(input), "\n"), "\n")
-	h := len(rows)
-	w := len(rows[0])
+func main() {
+	filepath := "../testdata/day8.txt"
+
+	topN := 3
 
 	coords, _ := loadVec3File(filepath)
+	n := len(coords)
 
-	fmt.Printf("We have %v rows, %v columns\n\n", h, w)
+	nDistances := n * (n - 1) / 2
+	nJoins := nDistances
 
-	for i, row := range rows {
-		fmt.Printf("%v: %v\n", i, row)
+	distanceInfo := fillDistanceLog(coords)
+
+	clusterMap, nodeMap, index := getClusterMap(distanceInfo, nJoins, n)
+
+	answer := scoreTopN(clusterMap, topN)
+
+	// _ = index
+	// index = 5493
+	// fmt.Printf("\nINFO: %v\n", distanceInfo[index-1])
+
+	answer2 := lastDistance(distanceInfo, index)
+
+	//fmt.Printf("\nWe have %v junction boxes to look through\n", topN)
+
+	//fmt.Printf("\nWe have %v unique distances\n", nDistances)
+
+	// fmt.Printf("\nDISTANCE INFO:\n")
+	// for i, row := range distanceInfo {
+	// 	if i < nJoins {
+	// 		fmt.Printf("%v: %v\n", i, row)
+	// 	}
+	// }
+
+	// fmt.Printf("\nCLUSTER MAP:\n")
+	// for i, row := range clusterMap {
+	// 	fmt.Printf("%v: %v\n", i, row)
+	// }
+
+	_ = nodeMap
+
+	// fmt.Printf("\nNODE MAP:\n")
+	// for i, row := range nodeMap {
+	// 	fmt.Printf("%v: %v\n", i, row)
+	// }
+
+	fmt.Printf("\nFINAL ANSWER = %v\n", answer)
+
+	fmt.Printf("\nFINAL FINAL ANSWER = %v\n", answer2)
+
+}
+
+func lastDistance(distances []DistanceLog, nDistances int) float64 {
+	last := distances[nDistances-1]
+	return last.v1.X * last.v2.X
+}
+
+func scoreTopN(clusterMap map[int][]int, n int) int {
+	runningProduct := 1
+	// Extract keys from clusterMap
+	keys := make([]int, 0, len(clusterMap))
+	for k := range clusterMap {
+		keys = append(keys, k)
 	}
 
-	fmt.Println("")
+	//fmt.Printf("KEYS: %v\n", keys)
 
-	for i, row := range coords {
-		fmt.Printf("%v: %v\n", i, row)
+	// Sort keys by the length of their corresponding slices (descending order)
+	sort.Slice(keys, func(i, j int) bool {
+		return len(clusterMap[keys[i]]) > len(clusterMap[keys[j]])
+	})
+
+	// Now iterate through sorted keys
+	for i, key := range keys {
+		if i <= n-1 {
+			//fmt.Printf("%v: %v (length: %d)\n", key, clusterMap[key], len(clusterMap[key]))
+			runningProduct *= len(clusterMap[key])
+		}
 	}
+	return runningProduct
+}
 
+func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[int][]int, map[int]int, int) {
+	index := 0
+	clusterMap := make(map[int][]int)
+	nodeMap := make(map[int]int)
+	clusterID := 1
+	for i := range nJoins {
+		// join the two vectors in distanceInfo
+		// what are there ids?
+		id1 := distanceInfo[i].id1
+		id2 := distanceInfo[i].id2
+		val1, ok1 := nodeMap[id1]
+		val2, ok2 := nodeMap[id2]
+
+		fmt.Printf("CLUSTER MAP (%v): %v\n", i, clusterMap)
+
+		if len(clusterMap[id1]) == nJunctions || len(clusterMap[id2]) == nJunctions {
+			index = i
+
+			//fmt.Printf("We have a single Super Cluster! i = %v\n%v\n", index, distanceInfo[index])
+
+			fmt.Printf("\nThis cluster: %v\nwas completed just before iteration %v\n", clusterMap, i)
+			fmt.Printf("We joined %v to %v\n", distanceInfo[i-1].id1, distanceInfo[i-1].id2)
+
+			fmt.Printf("Distance INFO: %v\n", distanceInfo[i-1])
+			fmt.Printf("x1: %v, x2: %v --> ANS = %v\n", distanceInfo[i-1].v1.X, distanceInfo[i-1].v2.X, distanceInfo[i-1].v1.X*distanceInfo[i-1].v2.X)
+
+			break
+		}
+
+		if ok1 && !ok2 {
+			//fmt.Printf("%v is new. Joining to %v\n", id2, id1)
+			// We have seen id1 already but not id2
+			// look up nodeMap to see which cluster id1 is in
+			clusterIDTemp := val1 // we already did this
+			// now add id2 to this cluster
+			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id2)
+			// and make sure we add id2 to nodeMap now
+			nodeMap[id2] = clusterIDTemp
+		} else if !ok1 && ok2 {
+			//fmt.Printf("%v is new. Joining to %v\n", id1, id2)
+			// We have not seen id1, but we have seen id2
+			clusterIDTemp := val2 // he was in this cluster
+			// add id1 to this cluster
+			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id1)
+			//update nodeMap
+			nodeMap[id1] = clusterIDTemp
+		} else if !ok1 && !ok2 {
+			//fmt.Printf("%v and %v are both new. Making new ID = %v\n", id1, id2, clusterID)
+			// We haven't seen either of these ids before
+			clusterIDTemp := clusterID // make new cluster ID
+			// add both to cluster map
+			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id1)
+			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id2)
+			// record that we have seen these
+			nodeMap[id1] = clusterIDTemp
+			nodeMap[id2] = clusterIDTemp
+			// Increment globale clusterID ready for next time this happens
+			clusterID++
+		} else if ok1 && ok2 {
+			//fmt.Printf("We have seen both %v and %v before.\n", id1, id2)
+			// We have seen both ids already, so they are both already in clusters
+			if val1 == val2 {
+				//fmt.Printf("They are already in the same cluster = %v.\n", val1)
+				// they already belong to the same cluster - do nothing
+				// check to see if all nodes are now in the same (single) cluster
+				continue
+			} else {
+				//fmt.Printf("Forcing %v to assimilate with %v.\n", id2, id1)
+				// they are in different clusters. Force cluster 2 to assimilate to cluster 1.
+				// get all the nodes that belong to cluster 2
+				nodesFrom2 := clusterMap[val2]
+				//fmt.Printf("Nodes from %v: %v\n", id2, nodesFrom2)
+				// add them to cluster 1
+				//fmt.Printf("Want to add them to %v\n", clusterMap[val1])
+				clusterMap[val1] = append(clusterMap[val1], nodesFrom2...)
+				// update where node is "pointing"
+				//fmt.Printf("Updating Node references for %v\n", nodesFrom2)
+				for _, node := range nodesFrom2 {
+					nodeMap[node] = val1
+				}
+				//delete k,v pair for cluster 2
+				delete(clusterMap, val2)
+			}
+		}
+
+		//clusterMap[clusterID] = append(clusterMap[clusterID], distanceInfo[i].id1, distanceInfo[i].id2)
+	}
+	return clusterMap, nodeMap, index
+}
+
+func fillDistanceLog(coords []Vec3) []DistanceLog {
+	var distances []DistanceLog
+	n := len(coords)
+	for i := range n - 1 {
+		// take vector coords[i] and measure distances to other n-1 vectors
+		for j := range n - 1 - i {
+			d := calcDistEuclid(coords[i], coords[j+i+1])
+			distances = append(distances, DistanceLog{i, j + i + 1, coords[i], coords[j+i+1], d, 0})
+		}
+	}
+	// now we sort by ascending distance
+	sort.Slice(distances, func(i, j int) bool {
+		return distances[i].d < distances[j].d
+	})
+	return distances
+}
+
+func calcDistEuclid(v1 Vec3, v2 Vec3) float64 {
+	ans := math.Sqrt((v1.X-v2.X)*(v1.X-v2.X) + (v1.Y-v2.Y)*(v1.Y-v2.Y) + (v1.Z-v2.Z)*(v1.Z-v2.Z))
+	return ans
 }
 
 func loadVec3File(path string) ([]Vec3, error) {
