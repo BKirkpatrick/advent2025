@@ -3,161 +3,184 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	s "strings"
 )
 
-func main() {
-	path := "../testdata/day5.txt"
-	var freshIDRanges []string
-	var items []string
-
-	// Read in our data line by line
-	dat, err := readLines(path)
-	if err != nil {
-		log.Printf("Problem reading input file")
-	}
-
-	listTracker := 0
-	for _, line := range dat {
-		if line == "" {
-			listTracker = 1
-		}
-		if listTracker == 0 {
-			freshIDRanges = append(freshIDRanges, line)
-		} else {
-			items = append(items, line)
-		}
-	}
-
-	howBadIsThis(freshIDRanges, items)
-
-	nFreshItems := countUniqueInRanges(freshIDRanges)
-
-	// Answer
-	fmt.Printf("\nANSWER: %v\n", nFreshItems)
-
+type Point struct {
+	X int
+	Y int
 }
 
-func readLines(path string) ([]string, error) {
-	file, err := os.Open(path)
+type Edge struct {
+	A, B Point
+}
+
+func main() {
+	filepath := "../testdata/day9.txt" // adjust
+
+	verts, err := loadPoints(filepath)
+	if err != nil {
+		panic(err)
+	}
+
+	n := len(verts)
+	fmt.Printf("N RED TILES = %d\n", n)
+
+	// We have some polygon formed by red tiles
+	edges := buildEdges(verts)
+
+	part1 := maxRectangleAreaAllPairs(verts)
+	part2 := maxRectangleAreaNoCut(verts, edges)
+
+	fmt.Println("Part 1 (no constraints) :", part1)
+	fmt.Println("Part 2 (only red/green) :", part2)
+}
+
+func loadPoints(path string) ([]Point, error) {
+	var pts []Point
+
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	var lines []string
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		line := s.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		coords := s.Split(line, ",")
+		if len(coords) != 2 {
+			return nil, fmt.Errorf("invalid line: %q", line)
+		}
+		x, err1 := strconv.Atoi(coords[0])
+		y, err2 := strconv.Atoi(coords[1])
+		if err1 != nil || err2 != nil {
+			return nil, fmt.Errorf("invalid integers on line: %q", line)
+		}
+		pts = append(pts, Point{X: x, Y: y})
 	}
-	return lines, scanner.Err()
+	return pts, scanner.Err()
 }
 
-func getBoundsFromRange(idRange string) (int, int) {
-	limits := s.Split(idRange, "-")
-	start, _ := strconv.Atoi(limits[0])
-	end, _ := strconv.Atoi(limits[1])
-	return start, end
-
+func buildEdges(verts []Point) []Edge {
+	n := len(verts)
+	edges := make([]Edge, n)
+	for i := 0; i < n; i++ {
+		edges[i] = Edge{
+			A: verts[i],
+			B: verts[(i+1)%n],
+		}
+	}
+	return edges
 }
 
-func countUniqueInRanges(idRanges []string) int {
-	// Parse all ranges
-	type Range struct {
-		start, end int
-	}
-	var ranges []Range
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		ranges = append(ranges, Range{start, end})
-	}
+// More succinct that previous version 'brute force'
+// This is all we need to solve part 1
+func maxRectangleAreaAllPairs(verts []Point) int64 {
+	n := len(verts)
+	var best int64
 
-	// Sort ranges by start position
-	// Use a simple bubble sort because I know the name of that sorting algorithm
-	for i := 0; i < len(ranges); i++ {
-		for j := i + 1; j < len(ranges); j++ {
-			if ranges[j].start < ranges[i].start {
-				ranges[i], ranges[j] = ranges[j], ranges[i]
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			a := verts[i]
+			b := verts[j]
+			w := abs(a.X-b.X) + 1
+			h := abs(a.Y-b.Y) + 1
+			area := int64(w) * int64(h)
+			if area > best {
+				best = area
 			}
 		}
 	}
+	return best
+}
 
-	// Merge overlapping ranges and count
-	if len(ranges) == 0 {
-		return 0
-	}
+// Same as above, but if rectangle 'cuts' our polygon we discard it
+func maxRectangleAreaNoCut(verts []Point, edges []Edge) int64 {
+	n := len(verts)
+	var best int64
 
-	count := 0
-	current := ranges[0]
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			p := verts[i]
+			q := verts[j]
 
-	for i := 1; i < len(ranges); i++ {
-		if ranges[i].start <= current.end+1 {
-			// Overlapping or adjacent - we should merge this
-			if ranges[i].end > current.end {
-				current.end = ranges[i].end
+			left := min(p.X, q.X)
+			right := max(p.X, q.X)
+			bottom := min(p.Y, q.Y)
+			top := max(p.Y, q.Y)
+
+			w := right - left + 1
+			h := top - bottom + 1
+			area := int64(w) * int64(h)
+			if area <= best {
+				continue
 			}
-		} else {
-			// No overlap - count current range and move to next
-			count += current.end - current.start + 1
-			current = ranges[i]
+
+			if rectangleCutByPolygon(left, right, bottom, top, edges) {
+				continue
+			}
+
+			best = area
 		}
 	}
-	// Don't forget the last range, idiot!
-	count += current.end - current.start + 1
-
-	return count
+	return best
 }
 
-func howBadIsThis(idRanges []string, items []string) {
-	nItems := len(items)
-	nIDRanges := len(idRanges)
-	nIDs := 0
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		nIDs += (end - start)
-	}
-	fmt.Printf("We have to check %v items against %v fresh IDS split across %v ID Ranges\n", nItems, nIDs, nIDRanges)
-}
-
-func isInRanges(id int, idRanges []string) bool {
-	for _, idRange := range idRanges {
-		start, end := getBoundsFromRange(idRange)
-		if id >= start && id <= end {
+// rectangleCutByPolygon returns true if ANY polygon edge passes through the
+// interior of the rectangle [left,right] x [bottom,top]. Touching edges are OK.
+func rectangleCutByPolygon(left, right, bottom, top int, edges []Edge) bool {
+	for _, e := range edges {
+		if rectEdgeIntersect(left, right, bottom, top, e) {
 			return true
 		}
 	}
 	return false
 }
 
-func getMyFreshItems(myItems []string, idRanges []string) []string {
-	var myFreshItems []string
-	for _, item := range myItems {
-		id, _ := strconv.Atoi(item)
-		if isInRanges(id, idRanges) {
-			myFreshItems = append(myFreshItems, item)
-		}
+// rectEdgeIntersect checks whether the edges of a rectangle intersect our polygon
+func rectEdgeIntersect(left, right, bottom, top int, e Edge) bool {
+	lx1, lx2 := e.A.X, e.B.X
+	if lx1 > lx2 {
+		lx1, lx2 = lx2, lx1
 	}
-	return myFreshItems
+	ly1, ly2 := e.A.Y, e.B.Y
+	if ly1 > ly2 {
+		ly1, ly2 = ly2, ly1
+	}
+
+	// If the edge is completely to left/right/below/above (including just touching), it's "away".
+	away :=
+		max(lx1, lx2) <= left || // entirely on or left of left side
+			min(lx1, lx2) >= right || // entirely on or right of right side
+			max(ly1, ly2) <= bottom || // entirely on or below bottom
+			min(ly1, ly2) >= top // entirely on or above top
+
+	// If NOT away, then this edge passes through the rectangle interior.
+	return !away
 }
 
-func findMaxID(idRanges []string) int {
-	maxID := 0
-	for _, idRange := range idRanges {
-		_, end := getBoundsFromRange(idRange)
-		if end > maxID {
-			maxID = end
-		}
+// stupid wee helper functions that Go doesn't have
+func abs(x int) int {
+	if x < 0 {
+		return -x
 	}
-	return maxID
+	return x
 }
-
-func makeList(n int) []string {
-	result := make([]string, 0, n)
-	for i := 1; i <= n; i++ {
-		result = append(result, strconv.Itoa(i))
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
-	return result
+	return b
+}
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
