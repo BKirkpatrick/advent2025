@@ -24,6 +24,8 @@ func main() {
 	tiles, bestMap, _ := loadCoordsFile(filepath)
 	nTiles := len(tiles)
 
+	grid := buildEmptyGrid(8, 8)
+
 	fmt.Printf("\nN TILES = %v\n", nTiles)
 
 	for i, tile := range tiles {
@@ -47,6 +49,24 @@ func main() {
 
 	fmt.Printf("GUESS USING BRUTE FORCE = %v \n", ansBF)
 
+	for _, row := range grid {
+		fmt.Printf("%v\n", row)
+	}
+
+}
+
+//func isRectangleValid()
+
+func buildEmptyGrid(h int, w int) []string {
+	var grid []string
+	var i int
+	row := s.Repeat(".", w)
+	for i = range h {
+		grid = append(grid, row)
+	}
+	fmt.Printf("Loaded %v rows\n", i)
+
+	return grid
 }
 
 func bruteForce(tiles []RedTile) float64 {
