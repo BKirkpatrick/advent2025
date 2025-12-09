@@ -17,45 +17,81 @@ type RedTile struct {
 	BR float64 // 'Bottom right' score
 }
 
+type Tile struct {
+	X float64
+	Y float64
+	C string
+}
+
 func main() {
-	filepath := "../testdata/day9.txt"
-	var ans float64
+	filepath := "../testdata/day9_test.txt"
 
-	tiles, bestMap, _ := loadCoordsFile(filepath)
-	nTiles := len(tiles)
+	redTiles, _ := loadTiles(filepath)
+	nRedTiles := len(redTiles)
 
-	grid := buildEmptyGrid(8, 8)
+	fmt.Printf("\nN RED TILES = %v\n\n", nRedTiles)
 
-	fmt.Printf("\nN TILES = %v\n", nTiles)
+	polygon := buildPolygon(redTiles)
 
-	for i, tile := range tiles {
-		fmt.Printf("\nTILE %v = %v\n", i, tile)
-	}
-
-	fmt.Printf("BEST MAP:\n%v\n", bestMap)
-
-	r1 := (bestMap["BR"].X - bestMap["TL"].X + 1) * (bestMap["BR"].Y - bestMap["TL"].Y + 1)
-	r2 := (bestMap["TR"].X - bestMap["BL"].X + 1) * (bestMap["BL"].Y - bestMap["TR"].Y + 1)
-
-	if r1 > r2 {
-		ans = r1 - r2
-	} else {
-		ans = r2 - r1
-	}
-
-	fmt.Printf("GUESS USING BEST = %v \n", ans)
-
-	ansBF := bruteForce(tiles)
-
-	fmt.Printf("GUESS USING BRUTE FORCE = %v \n", ansBF)
-
-	for _, row := range grid {
-		fmt.Printf("%v\n", row)
+	for i, tile := range polygon {
+		fmt.Printf("TILE %v = %v\n", i, tile)
 	}
 
 }
 
-//func isRectangleValid()
+func buildPolygon(redTiles []Tile) []Tile {
+	var vertices []Tile
+	nTiles := len(redTiles)
+	for i := range nTiles - 1 {
+		p1 := redTiles[i]
+		p2 := redTiles[i+1]
+		line := connect2Points(p1, p2)
+		vertices = append(vertices, line...)
+	}
+	// Now we have to add the one where it loops back
+	p1 := redTiles[nTiles-1]
+	p2 := redTiles[0]
+	line := connect2Points(p1, p2)
+	vertices = append(vertices, line...)
+
+	return vertices
+}
+
+func connect2Points(p1 Tile, p2 Tile) []Tile {
+	// We move from p1 --> p2
+	var vertices []Tile
+	if p1.X == p2.X {
+		// line must be vertical
+		if p1.Y > p2.Y {
+			// we are moving upwards
+			for i := p1.Y; i > p2.Y-1; i-- {
+				vertices = append(vertices, Tile{p1.X, i, "green"})
+			}
+		} else {
+			// we are moving downwards
+			for i := p1.Y; i < p2.Y+1; i++ {
+				vertices = append(vertices, Tile{p1.X, i, "green"})
+			}
+		}
+	} else {
+		// line must be horizontal
+		if p1.X > p2.X {
+			// we are moving left
+			for i := p1.X; i > p2.X-1; i-- {
+				vertices = append(vertices, Tile{i, p1.Y, "green"})
+			}
+		} else {
+			// we are moving right
+			for i := p1.X; i < p2.X+1; i++ {
+				vertices = append(vertices, Tile{i, p1.Y, "green"})
+			}
+		}
+	}
+	vertices[0].C = "red"
+	n := len(vertices)
+	vertices = vertices[:n-1]
+	return vertices
+}
 
 func buildEmptyGrid(h int, w int) []string {
 	var grid []string
@@ -97,6 +133,41 @@ func bruteForce(tiles []RedTile) float64 {
 		}
 	}
 	return biggestArea
+}
+
+func loadTiles(path string) ([]Tile, error) {
+	var vertices []Tile
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := s.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		coords := s.Split(line, ",")
+
+		if len(coords) != 2 {
+			return nil, fmt.Errorf("invalid line: %q", line)
+		}
+
+		x, err1 := strconv.Atoi(coords[0])
+		y, err2 := strconv.Atoi(coords[1])
+
+		if err1 != nil || err2 != nil {
+			return nil, fmt.Errorf("invalid integers on line: %q", line)
+		}
+
+		vertices = append(vertices, Tile{float64(x), float64(y), "red"})
+	}
+	return vertices, scanner.Err()
+
 }
 
 func loadCoordsFile(path string) ([]RedTile, map[string]RedTile, error) {
@@ -163,157 +234,3 @@ func loadCoordsFile(path string) ([]RedTile, map[string]RedTile, error) {
 
 	return tiles, bestMap, scanner.Err()
 }
-
-// func mapComplete(clusterMap map[int][]int, nMembers int) bool {
-// 	var ans bool
-// 	keys := make([]int, 0, len(clusterMap))
-// 	for k := range clusterMap {
-// 		keys = append(keys, k)
-// 	}
-// 	if len(keys) > 0 {
-// 		if len(clusterMap[keys[0]]) == nMembers {
-// 			ans = true
-// 		} else {
-// 			ans = false
-// 		}
-// 	}
-// 	return ans
-// }
-
-// func lastDistance(distances []DistanceLog, nDistances int) float64 {
-// 	last := distances[nDistances-1]
-// 	return last.v1.X * last.v2.X
-// }
-
-// func scoreTopN(clusterMap map[int][]int, n int) int {
-// 	runningProduct := 1
-// 	// Extract keys from clusterMap
-// 	keys := make([]int, 0, len(clusterMap))
-// 	for k := range clusterMap {
-// 		keys = append(keys, k)
-// 	}
-
-// 	//fmt.Printf("KEYS: %v\n", keys)
-
-// 	// Sort keys by the length of their corresponding slices (descending order)
-// 	sort.Slice(keys, func(i, j int) bool {
-// 		return len(clusterMap[keys[i]]) > len(clusterMap[keys[j]])
-// 	})
-
-// 	// Now iterate through sorted keys
-// 	for i, key := range keys {
-// 		if i <= n-1 {
-// 			//fmt.Printf("%v: %v (length: %d)\n", key, clusterMap[key], len(clusterMap[key]))
-// 			runningProduct *= len(clusterMap[key])
-// 		}
-// 	}
-// 	return runningProduct
-// }
-
-// func getClusterMap(distanceInfo []DistanceLog, nJoins int, nJunctions int) (map[int][]int, map[int]int) {
-// 	clusterMap := make(map[int][]int)
-// 	nodeMap := make(map[int]int)
-// 	clusterID := 1
-// 	for i := range nJoins {
-// 		// join the two vectors in distanceInfo
-// 		// what are there ids?
-// 		id1 := distanceInfo[i].id1
-// 		id2 := distanceInfo[i].id2
-// 		val1, ok1 := nodeMap[id1]
-// 		val2, ok2 := nodeMap[id2]
-
-// 		fmt.Printf("CLUSTER MAP (%v): %v\n", i, clusterMap)
-
-// 		if mapComplete(clusterMap, nJunctions) {
-// 			fmt.Printf("DONE\n")
-// 			fmt.Printf("The final connection was:\n")
-// 			fmt.Printf("INFO %v - %v\n", i-1, distanceInfo[i-1])
-// 			x1 := distanceInfo[i-1].v1.X
-// 			x2 := distanceInfo[i-1].v2.X
-// 			prod := x1 * x2
-// 			fmt.Printf("X1: %v, X2: %v -- PROD: %v\n", x1, x2, prod)
-// 			break
-// 		}
-
-// 		if ok1 && !ok2 {
-// 			//fmt.Printf("%v is new. Joining to %v\n", id2, id1)
-// 			// We have seen id1 already but not id2
-// 			// look up nodeMap to see which cluster id1 is in
-// 			clusterIDTemp := val1 // we already did this
-// 			// now add id2 to this cluster
-// 			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id2)
-// 			// and make sure we add id2 to nodeMap now
-// 			nodeMap[id2] = clusterIDTemp
-// 		} else if !ok1 && ok2 {
-// 			//fmt.Printf("%v is new. Joining to %v\n", id1, id2)
-// 			// We have not seen id1, but we have seen id2
-// 			clusterIDTemp := val2 // he was in this cluster
-// 			// add id1 to this cluster
-// 			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id1)
-// 			//update nodeMap
-// 			nodeMap[id1] = clusterIDTemp
-// 		} else if !ok1 && !ok2 {
-// 			//fmt.Printf("%v and %v are both new. Making new ID = %v\n", id1, id2, clusterID)
-// 			// We haven't seen either of these ids before
-// 			clusterIDTemp := clusterID // make new cluster ID
-// 			// add both to cluster map
-// 			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id1)
-// 			clusterMap[clusterIDTemp] = append(clusterMap[clusterIDTemp], id2)
-// 			// record that we have seen these
-// 			nodeMap[id1] = clusterIDTemp
-// 			nodeMap[id2] = clusterIDTemp
-// 			// Increment globale clusterID ready for next time this happens
-// 			clusterID++
-// 		} else if ok1 && ok2 {
-// 			//fmt.Printf("We have seen both %v and %v before.\n", id1, id2)
-// 			// We have seen both ids already, so they are both already in clusters
-// 			if val1 == val2 {
-// 				//fmt.Printf("They are already in the same cluster = %v.\n", val1)
-// 				// they already belong to the same cluster - do nothing
-// 				// check to see if all nodes are now in the same (single) cluster
-// 				continue
-// 			} else {
-// 				//fmt.Printf("Forcing %v to assimilate with %v.\n", id2, id1)
-// 				// they are in different clusters. Force cluster 2 to assimilate to cluster 1.
-// 				// get all the nodes that belong to cluster 2
-// 				nodesFrom2 := clusterMap[val2]
-// 				//fmt.Printf("Nodes from %v: %v\n", id2, nodesFrom2)
-// 				// add them to cluster 1
-// 				//fmt.Printf("Want to add them to %v\n", clusterMap[val1])
-// 				clusterMap[val1] = append(clusterMap[val1], nodesFrom2...)
-// 				// update where node is "pointing"
-// 				//fmt.Printf("Updating Node references for %v\n", nodesFrom2)
-// 				for _, node := range nodesFrom2 {
-// 					nodeMap[node] = val1
-// 				}
-// 				//delete k,v pair for cluster 2
-// 				delete(clusterMap, val2)
-// 			}
-// 		}
-
-// 		//clusterMap[clusterID] = append(clusterMap[clusterID], distanceInfo[i].id1, distanceInfo[i].id2)
-// 	}
-// 	return clusterMap, nodeMap
-// }
-
-// func fillDistanceLog(coords []Vec3) []DistanceLog {
-// 	var distances []DistanceLog
-// 	n := len(coords)
-// 	for i := range n - 1 {
-// 		// take vector coords[i] and measure distances to other n-1 vectors
-// 		for j := range n - 1 - i {
-// 			d := calcDistEuclid(coords[i], coords[j+i+1])
-// 			distances = append(distances, DistanceLog{i, j + i + 1, coords[i], coords[j+i+1], d, 0})
-// 		}
-// 	}
-// 	// now we sort by ascending distance
-// 	sort.Slice(distances, func(i, j int) bool {
-// 		return distances[i].d < distances[j].d
-// 	})
-// 	return distances
-// }
-
-// func calcDistEuclid(v1 Vec3, v2 Vec3) float64 {
-// 	ans := math.Sqrt((v1.X-v2.X)*(v1.X-v2.X) + (v1.Y-v2.Y)*(v1.Y-v2.Y) + (v1.Z-v2.Z)*(v1.Z-v2.Z))
-// 	return ans
-// }
