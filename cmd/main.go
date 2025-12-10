@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 	s "strings"
-	"time"
 )
 
 // Day 10
@@ -41,7 +40,7 @@ type Result struct {
 }
 
 func main() {
-	filepath := "../testdata/day10_test.txt" // adjust
+	filepath := "../testdata/day10.txt" // adjust
 
 	data, err := loadData(filepath)
 	if err != nil {
@@ -53,17 +52,13 @@ func main() {
 
 	calcs := prepareCalculations(data)
 
-	for i, j := range calcs {
-		if i == 0 {
-			fmt.Printf("%v: %v\n", i, j)
-		}
+	ans := 0
+
+	for _, j := range calcs {
+		ans += areWeThereYet(j)
 	}
 
-	myCalc := calcs[0]
-
-	nPresses := areWeThereYet(myCalc)
-
-	fmt.Printf("ANS = %v\n", nPresses)
+	fmt.Printf("ANS = %v\n", ans)
 
 	// results, answer := doAllCalculations(calcs)
 
@@ -142,35 +137,54 @@ func areWeThereYet(calc Calculation) int {
 	nLights := len(tar)
 	start := make([]int, nLights)
 	fronteir = append(fronteir, start)
+
+	// Track visited positions to avoid duplicates
+	visited := make(map[string]bool)
+	visited[fmt.Sprintf("%v", start)] = true
+
 	// So my idea is just to test all first steps, then all seconds from those first, etc
 	// And test whether I have arrived at my destination
 	nPresses := 0
-	for x := 0; x < 12; x++ {
+	for x := 0; x < 100; x++ {
 		// We press the button
 		nPresses++
 		var holder [][]int
-		fmt.Printf("HERE IS OUR FRONTEIR - %v\n", fronteir)
+		//fmt.Printf("HERE IS OUR FRONTEIR - size %v\n", len(fronteir))
 		for _, pos := range fronteir {
 			// Every one of these is a position in our fronteir
 			// fmt.Printf("%v\n", pos)
 			for _, bv := range bvs {
 				// fmt.Printf("BV - %v\n", bv)
 				res := addVectors(pos, bv)
-				holder = append(holder, res)
-				// fmt.Printf("%v\n", res)
 
-				time.Sleep(time.Millisecond * 500)
+				// Check if we've visited this position before
+				key := fmt.Sprintf("%v", res)
 
 				if vectorsEqual(res, tar) {
 					// We reached our destination
-					fmt.Printf("We have arrived at %v after %v button presses", res, nPresses)
-					break
+					fmt.Printf("We have arrived at %v after %v button presses\n", res, nPresses)
+					return nPresses
 				}
 
-			}
+				// CRITICAL: Don't explore if we've overshot the target in ANY dimension
+				// Since joltages can only increase, overshooting means we can never reach target
+				overshot := false
+				for i := range res {
+					if res[i] > tar[i] {
+						overshot = true
+						break
+					}
+				}
 
+				// Only add if we haven't seen this position before AND haven't overshot
+				if !overshot && !visited[key] {
+					visited[key] = true
+					holder = append(holder, res)
+				}
+			}
 		}
-		fronteir = append(fronteir, holder...)
+		//fronteir = append(fronteir, holder...)
+		fronteir = holder
 	}
 	return nPresses
 }
