@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	s "strings"
 )
@@ -39,6 +40,80 @@ func main() {
 		fmt.Printf("Data[%v]: %v\n", i, j)
 	}
 
+	fmt.Println("")
+	for i := range n {
+		fmt.Printf("TARGET for %v = %v\n", data[i].lights, lightsTargetVector(data[i].lights))
+	}
+
+	fmt.Println("")
+	for i := range n {
+		fmt.Printf("BUTTON VECTORS for %v = %v\n", data[i].buttons, buttonVectors(data[i].buttons, len(data[i].lights)))
+	}
+	bv1 := []int{0, 1, 0}
+	bv2 := []int{1, 1, 1}
+	bv3 := addWrapButtonVectors(bv1, bv2)
+	fmt.Printf("Wrapped Sum of %v and %v = %v\n", bv1, bv2, bv3)
+
+}
+
+func calculateNPushes(data Data, buttonsPushed []int) int {
+	n := len(buttonsPushed)
+	return n
+}
+
+func calculateJoltage(data Data, buttonsPushed []int) int {
+	joltage := 0
+	for _, j := range buttonsPushed {
+		joltage += data.joltages[j]
+	}
+	return joltage
+}
+
+func addWrapButtonVectors(bv1 []int, bv2 []int) []int {
+	var bv3 []int
+	var elem int
+	for i := range len(bv1) {
+		// add components
+		elem = bv1[i] + bv2[i]
+		// wrap
+		elem = elem % 2
+		bv3 = append(bv3, elem)
+	}
+	return bv3
+}
+
+func buttonVectors(buttons [][]int, nDim int) [][]int {
+	var vectors [][]int
+	for _, button := range buttons {
+		bv := buttonVector(button, nDim)
+		vectors = append(vectors, bv)
+	}
+	return vectors
+}
+
+func buttonVector(button []int, nDim int) []int {
+	var vector []int
+	for i := range nDim - 2 {
+		if slices.Contains(button, i) {
+			vector = append(vector, 1)
+		} else {
+			vector = append(vector, 0)
+		}
+	}
+	return vector
+}
+
+func lightsTargetVector(lights string) []int {
+	var target []int
+
+	for _, j := range lights {
+		if j == '.' {
+			target = append(target, 0)
+		} else if j == '#' {
+			target = append(target, 1)
+		}
+	}
+	return target
 }
 
 func loadData(path string) ([]Data, error) {
