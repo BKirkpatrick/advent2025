@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	s "strings"
+	"time"
 )
 
 // Day 10
@@ -40,7 +41,7 @@ type Result struct {
 }
 
 func main() {
-	filepath := "../testdata/day10.txt" // adjust
+	filepath := "../testdata/day10_test.txt" // adjust
 
 	data, err := loadData(filepath)
 	if err != nil {
@@ -52,13 +53,25 @@ func main() {
 
 	calcs := prepareCalculations(data)
 
-	results, answer := doAllCalculations(calcs)
-
-	for i, j := range results {
-		fmt.Printf("%v: %v\n", i, j)
+	for i, j := range calcs {
+		if i == 0 {
+			fmt.Printf("%v: %v\n", i, j)
+		}
 	}
 
-	fmt.Printf("\nANSWER = %v\n", answer)
+	myCalc := calcs[0]
+
+	nPresses := areWeThereYet(myCalc)
+
+	fmt.Printf("ANS = %v\n", nPresses)
+
+	// results, answer := doAllCalculations(calcs)
+
+	// for i, j := range results {
+	// 	fmt.Printf("%v: %v\n", i, j)
+	// }
+
+	// fmt.Printf("\nANSWER = %v\n", answer)
 
 }
 
@@ -120,13 +133,46 @@ func doCalculation(calc Calculation) []Result {
 	return results
 }
 
-func findSliceIndex(buttonVectors [][]int, combo []int) int {
-	for i, slice := range buttonVectors {
-		if slices.Equal(slice, combo) {
-			return i
+func areWeThereYet(calc Calculation) int {
+	//var results []Result
+	var fronteir [][]int
+	bvs := calc.buttonVectors
+	// now we are targetting the joltage
+	tar := calc.joltages
+	nLights := len(tar)
+	start := make([]int, nLights)
+	fronteir = append(fronteir, start)
+	// So my idea is just to test all first steps, then all seconds from those first, etc
+	// And test whether I have arrived at my destination
+	nPresses := 0
+	for x := 0; x < 12; x++ {
+		// We press the button
+		nPresses++
+		var holder [][]int
+		fmt.Printf("HERE IS OUR FRONTEIR - %v\n", fronteir)
+		for _, pos := range fronteir {
+			// Every one of these is a position in our fronteir
+			// fmt.Printf("%v\n", pos)
+			for _, bv := range bvs {
+				// fmt.Printf("BV - %v\n", bv)
+				res := addVectors(pos, bv)
+				holder = append(holder, res)
+				// fmt.Printf("%v\n", res)
+
+				time.Sleep(time.Millisecond * 500)
+
+				if vectorsEqual(res, tar) {
+					// We reached our destination
+					fmt.Printf("We have arrived at %v after %v button presses", res, nPresses)
+					break
+				}
+
+			}
+
 		}
+		fronteir = append(fronteir, holder...)
 	}
-	return -1
+	return nPresses
 }
 
 func prepareCalculations(data []Data) []Calculation {
@@ -155,6 +201,16 @@ func calculateJoltage(calc Calculation, target []int) int {
 		}
 	}
 	return joltage
+}
+
+func addVectors(bv1 []int, bv2 []int) []int {
+	var bv3 []int
+	var elem int
+	for i := range len(bv1) {
+		elem = bv1[i] + bv2[i]
+		bv3 = append(bv3, elem)
+	}
+	return bv3
 }
 
 func addWrapButtonVectors(bv1 []int, bv2 []int) []int {
