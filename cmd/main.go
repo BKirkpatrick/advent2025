@@ -8,6 +8,16 @@ import (
 	s "strings"
 )
 
+// Day 10
+// For a display with N buttons we are looking for a point in N-dimensional space.
+// You are either 0 or 1 distance along each of the N dimensions.
+// If I transform the button circuits into N-dimensional vectors, can we look through
+// the components of those vectors to see what combo (+ and -) give desired output?
+
+// Data structure will have target vector (lights)
+// and a list of 'basis' vectors (the button circuits)
+// I should also store the joltage requirements - they are going to be needed for part 2...
+
 type Point struct {
 	X int
 	Y int
