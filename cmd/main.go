@@ -25,8 +25,22 @@ type Data struct {
 	joltages []int
 }
 
+type Calculation struct {
+	target        []int
+	buttonVectors [][]int
+	joltages      []int
+}
+
+type Result struct {
+	target        []int
+	buttonVectors [][]int
+	buttonsPushed []int
+	buttonScore   int
+	joltageScore  int
+}
+
 func main() {
-	filepath := "../testdata/day10_test.txt" // adjust
+	filepath := "../testdata/day10.txt" // adjust
 
 	data, err := loadData(filepath)
 	if err != nil {
@@ -36,24 +50,96 @@ func main() {
 	n := len(data)
 	fmt.Printf("N data = %v\n", n)
 
-	for i, j := range data {
-		fmt.Printf("Data[%v]: %v\n", i, j)
+	calcs := prepareCalculations(data)
+
+	results, answer := doAllCalculations(calcs)
+
+	for i, j := range results {
+		fmt.Printf("%v: %v\n", i, j)
 	}
 
-	fmt.Println("")
-	for i := range n {
-		fmt.Printf("TARGET for %v = %v\n", data[i].lights, lightsTargetVector(data[i].lights))
+	fmt.Printf("\nANSWER = %v\n", answer)
+
+}
+
+func doAllCalculations(calcs []Calculation) ([]Result, int) {
+	nPushes := 0
+	var results []Result
+	for _, calc := range calcs {
+		res := doCalculation(calc)
+		myResult := res[0]
+		results = append(results, myResult)
+		nPushes += myResult.buttonScore
+	}
+	return results, nPushes
+}
+
+func vectorsEqual(v1 []int, v2 []int) bool {
+	var ans bool
+	for i := range len(v1) {
+		if v1[i] != v2[i] {
+			// vectors not equal
+			ans = false
+			break
+		} else {
+			ans = true
+			continue
+		}
+	}
+	return ans
+}
+
+func doCalculation(calc Calculation) []Result {
+	var results []Result
+	totalButtons := len(calc.buttonVectors)
+	// fmt.Printf("\nI am about to tackle this calculation\n:%v\n", calc)
+	// fmt.Printf("Calculation involves %v buttons\n", totalButtons)
+	tar := calc.target
+	// first you need to loop over how many buttons you want to push
+	var buttonTests [][]int
+
+	// Generate all combinations: 1 button, 2 buttons, ..., up to totalButtons
+	for numButtons := 1; numButtons <= totalButtons; numButtons++ {
+		combos := generateCombinations(totalButtons, numButtons)
+		buttonTests = append(buttonTests, combos...)
 	}
 
-	fmt.Println("")
-	for i := range n {
-		fmt.Printf("BUTTON VECTORS for %v = %v\n", data[i].buttons, buttonVectors(data[i].buttons, len(data[i].lights)))
+	for _, combo := range buttonTests {
+		ans := make([]int, len(tar))
+		for _, ind := range combo {
+			ans = addWrapButtonVectors(ans, calc.buttonVectors[ind])
+		}
+		if vectorsEqual(ans, tar) {
+			fmt.Printf("This works! %v\n", combo)
+			//ind := findSliceIndex(calc.buttonVectors, combo)
+			jolts := calculateJoltage(calc, tar)
+			results = append(results, Result{tar, calc.buttonVectors, combo, len(combo), jolts})
+			break
+		}
 	}
-	bv1 := []int{0, 1, 0}
-	bv2 := []int{1, 1, 1}
-	bv3 := addWrapButtonVectors(bv1, bv2)
-	fmt.Printf("Wrapped Sum of %v and %v = %v\n", bv1, bv2, bv3)
+	return results
+}
 
+func findSliceIndex(buttonVectors [][]int, combo []int) int {
+	for i, slice := range buttonVectors {
+		if slices.Equal(slice, combo) {
+			return i
+		}
+	}
+	return -1
+}
+
+func prepareCalculations(data []Data) []Calculation {
+	var calcs []Calculation
+
+	for _, j := range data {
+		target := lightsTargetVector(j.lights)
+		nDim := len(j.lights)
+		bvs := buttonVectors(j.buttons, nDim)
+		jolts := j.joltages
+		calcs = append(calcs, Calculation{target, bvs, jolts})
+	}
+	return calcs
 }
 
 func calculateNPushes(data Data, buttonsPushed []int) int {
@@ -61,10 +147,12 @@ func calculateNPushes(data Data, buttonsPushed []int) int {
 	return n
 }
 
-func calculateJoltage(data Data, buttonsPushed []int) int {
+func calculateJoltage(calc Calculation, target []int) int {
 	joltage := 0
-	for _, j := range buttonsPushed {
-		joltage += data.joltages[j]
+	for i, j := range target {
+		if j == 1 {
+			joltage += calc.joltages[i]
+		}
 	}
 	return joltage
 }
@@ -193,4 +281,29 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// generateCombinations returns all combinations of k buttons from n total buttons (0-indexed)
+func generateCombinations(n, k int) [][]int {
+	var result [][]int
+	var current []int
+
+	var backtrack func(start int)
+	backtrack = func(start int) {
+		if len(current) == k {
+			combo := make([]int, k)
+			copy(combo, current)
+			result = append(result, combo)
+			return
+		}
+
+		for i := start; i < n; i++ {
+			current = append(current, i)
+			backtrack(i + 1)
+			current = current[:len(current)-1]
+		}
+	}
+
+	backtrack(0)
+	return result
 }
