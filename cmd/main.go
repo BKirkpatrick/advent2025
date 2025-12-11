@@ -93,7 +93,7 @@ func countPathsWithRequired(current, target string, graph map[string][]string, s
 	return totalPaths
 }
 
-// countPathsWithRequiredMemo is the memoized version for performance
+// countPathsWithRequiredMemo is the memoised version for performance
 // What is the trick here?
 // If we reach the same node with the same (seenDac, seenFft) state,
 // the answer will be the same - so cache it and move on with our life.
