@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
-	"slices"
 	"strconv"
 	s "strings"
 )
@@ -25,20 +25,6 @@ type Data struct {
 	joltages []int
 }
 
-type Calculation struct {
-	target        []int
-	buttonVectors [][]int
-	joltages      []int
-}
-
-type Result struct {
-	target        []int
-	buttonVectors [][]int
-	buttonsPushed []int
-	buttonScore   int
-	joltageScore  int
-}
-
 func main() {
 	filepath := "../testdata/day10.txt" // adjust
 
@@ -47,161 +33,158 @@ func main() {
 		panic(err)
 	}
 
-	n := len(data)
-	fmt.Printf("N data = %v\n", n)
-
-	calcs := prepareCalculations(data)
-
-	results, answer := doAllCalculations(calcs)
-
-	for i, j := range results {
-		fmt.Printf("%v: %v\n", i, j)
+	total := 0
+	for _, d := range data {
+		total += solveMachinePart2(d.buttons, d.joltages)
 	}
-
-	fmt.Printf("\nANSWER = %v\n", answer)
+	fmt.Printf("PART 2 ANSWER = %d\n", total)
 
 }
 
-func doAllCalculations(calcs []Calculation) ([]Result, int) {
-	nPushes := 0
-	var results []Result
-	for _, calc := range calcs {
-		res := doCalculation(calc)
-		myResult := res[0]
-		results = append(results, myResult)
-		nPushes += myResult.buttonScore
-	}
-	return results, nPushes
+type cand struct {
+	dec []int // integer decrement vector d(S)
+	k   int   // |S| (buttons pressed once in this parity-fixing step)
 }
 
-func vectorsEqual(v1 []int, v2 []int) bool {
-	var ans bool
-	for i := range len(v1) {
-		if v1[i] != v2[i] {
-			// vectors not equal
-			ans = false
-			break
-		} else {
-			ans = true
-			continue
+func solveMachinePart2(buttons [][]int, target []int) int {
+	// Assumption: number of counters <= 64
+	// If ever exceed 64, switch parity keys from uint64 to a byte-slice key.
+	n := len(target)
+	m := len(buttons)
+
+	// Build per-button parity mask over counters.
+	btnMask := make([]uint64, m)
+	for i, btn := range buttons {
+		var mask uint64
+		for _, idx := range btn {
+			mask ^= (1 << uint(idx)) // toggle bit for parity
 		}
+		btnMask[i] = mask
+	}
+
+	// Precompute all subsets S, grouped by parityKey(S).
+	// For each subset, store:
+	// - integer decrement vector d(S) (counts overlaps)
+	// - k = popcount(S)
+	buckets := make(map[uint64][]cand, 1<<minInt(m, 16))
+
+	limit := 1 << uint(m)
+	for subset := 0; subset < limit; subset++ {
+		par := uint64(0)
+		dec := make([]int, n)
+		k := 0
+
+		for i := 0; i < m; i++ {
+			if (subset>>uint(i))&1 == 0 {
+				continue
+			}
+			k++
+			par ^= btnMask[i]
+			for _, idx := range buttons[i] {
+				dec[idx]++
+			}
+		}
+
+		buckets[par] = append(buckets[par], cand{dec: dec, k: k})
+	}
+
+	// Memoized recursion f(b): minimum presses to reach b exactly.
+	memo := make(map[string]int, 1024)
+
+	var f func(b []int) int
+	f = func(b []int) int {
+		key := vecKey(b)
+		if v, ok := memo[key]; ok {
+			return v
+		}
+
+		// base case
+		allZero := true
+		for _, x := range b {
+			if x != 0 {
+				allZero = false
+				break
+			}
+		}
+		if allZero {
+			memo[key] = 0
+			return 0
+		}
+
+		// parity key p = b mod 2 as bitmask
+		var p uint64
+		for i, x := range b {
+			if x&1 == 1 {
+				p |= (1 << uint(i))
+			}
+		}
+
+		cands := buckets[p]
+		if len(cands) == 0 {
+			memo[key] = inf()
+			return memo[key]
+		}
+
+		best := inf()
+		for _, c := range cands {
+			// r = b - d(S)
+			// must be nonnegative; then child = r/2
+			child := make([]int, n)
+			ok := true
+			for i := 0; i < n; i++ {
+				r := b[i] - c.dec[i]
+				if r < 0 {
+					ok = false
+					break
+				}
+				// Since parity matches, r should be even; integer division is safe.
+				child[i] = r / 2
+			}
+			if !ok {
+				continue
+			}
+
+			sub := f(child)
+			if sub == inf() {
+				continue
+			}
+
+			cost := c.k + 2*sub
+			if cost < best {
+				best = cost
+			}
+		}
+
+		memo[key] = best
+		return best
+	}
+
+	ans := f(target)
+	if ans == inf() {
+		panic(fmt.Sprintf("no solution for machine target=%v", target))
 	}
 	return ans
 }
 
-func doCalculation(calc Calculation) []Result {
-	var results []Result
-	totalButtons := len(calc.buttonVectors)
-	// fmt.Printf("\nI am about to tackle this calculation\n:%v\n", calc)
-	// fmt.Printf("Calculation involves %v buttons\n", totalButtons)
-	tar := calc.target
-	// first you need to loop over how many buttons you want to push
-	var buttonTests [][]int
-
-	// Generate all combinations: 1 button, 2 buttons, ..., up to totalButtons
-	for numButtons := 1; numButtons <= totalButtons; numButtons++ {
-		combos := generateCombinations(totalButtons, numButtons)
-		buttonTests = append(buttonTests, combos...)
-	}
-
-	for _, combo := range buttonTests {
-		ans := make([]int, len(tar))
-		for _, ind := range combo {
-			ans = addWrapButtonVectors(ans, calc.buttonVectors[ind])
+func vecKey(v []int) string {
+	// Compact-ish string key for memoization.
+	var bld s.Builder
+	for i, x := range v {
+		if i > 0 {
+			bld.WriteByte(',')
 		}
-		if vectorsEqual(ans, tar) {
-			fmt.Printf("This works! %v\n", combo)
-			//ind := findSliceIndex(calc.buttonVectors, combo)
-			jolts := calculateJoltage(calc, tar)
-			results = append(results, Result{tar, calc.buttonVectors, combo, len(combo), jolts})
-			break
-		}
+		bld.WriteString(strconv.Itoa(x))
 	}
-	return results
+	return bld.String()
 }
 
-func findSliceIndex(buttonVectors [][]int, combo []int) int {
-	for i, slice := range buttonVectors {
-		if slices.Equal(slice, combo) {
-			return i
-		}
+func inf() int { return math.MaxInt / 4 }
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
 	}
-	return -1
-}
-
-func prepareCalculations(data []Data) []Calculation {
-	var calcs []Calculation
-
-	for _, j := range data {
-		target := lightsTargetVector(j.lights)
-		nDim := len(j.lights)
-		bvs := buttonVectors(j.buttons, nDim)
-		jolts := j.joltages
-		calcs = append(calcs, Calculation{target, bvs, jolts})
-	}
-	return calcs
-}
-
-func calculateNPushes(data Data, buttonsPushed []int) int {
-	n := len(buttonsPushed)
-	return n
-}
-
-func calculateJoltage(calc Calculation, target []int) int {
-	joltage := 0
-	for i, j := range target {
-		if j == 1 {
-			joltage += calc.joltages[i]
-		}
-	}
-	return joltage
-}
-
-func addWrapButtonVectors(bv1 []int, bv2 []int) []int {
-	var bv3 []int
-	var elem int
-	for i := range len(bv1) {
-		// add components
-		elem = bv1[i] + bv2[i]
-		// wrap
-		elem = elem % 2
-		bv3 = append(bv3, elem)
-	}
-	return bv3
-}
-
-func buttonVectors(buttons [][]int, nDim int) [][]int {
-	var vectors [][]int
-	for _, button := range buttons {
-		bv := buttonVector(button, nDim)
-		vectors = append(vectors, bv)
-	}
-	return vectors
-}
-
-func buttonVector(button []int, nDim int) []int {
-	var vector []int
-	for i := range nDim - 2 {
-		if slices.Contains(button, i) {
-			vector = append(vector, 1)
-		} else {
-			vector = append(vector, 0)
-		}
-	}
-	return vector
-}
-
-func lightsTargetVector(lights string) []int {
-	var target []int
-
-	for _, j := range lights {
-		if j == '.' {
-			target = append(target, 0)
-		} else if j == '#' {
-			target = append(target, 1)
-		}
-	}
-	return target
+	return b
 }
 
 func loadData(path string) ([]Data, error) {
@@ -261,49 +244,4 @@ func loadData(path string) ([]Data, error) {
 		data = append(data, Data{lights: lights, buttons: buttonList, joltages: joltageList})
 	}
 	return data, scanner.Err()
-}
-
-// stupid wee helper functions that Go doesn't have
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// generateCombinations returns all combinations of k buttons from n total buttons (0-indexed)
-func generateCombinations(n, k int) [][]int {
-	var result [][]int
-	var current []int
-
-	var backtrack func(start int)
-	backtrack = func(start int) {
-		if len(current) == k {
-			combo := make([]int, k)
-			copy(combo, current)
-			result = append(result, combo)
-			return
-		}
-
-		for i := start; i < n; i++ {
-			current = append(current, i)
-			backtrack(i + 1)
-			current = current[:len(current)-1]
-		}
-	}
-
-	backtrack(0)
-	return result
 }
